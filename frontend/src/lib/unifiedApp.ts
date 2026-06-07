@@ -270,11 +270,214 @@ const aiFeatures = [
   },
 ] as const;
 
-const allFeatures = [...features, ...aiFeatures];
+const supplementalFeatures = [
+  {
+    slug: "evidence-requests",
+    title: "Evidence Requests",
+    href: "/evidence-requests",
+    category: "Operations",
+    icon: ShieldCheck,
+    summary: "Evidence Requests workspace for intake queues, assignments, SLA tracking, exception handling, stakeholder updates, and closeout evidence in Product Compliance Evidence Vault.",
+    bullets: ["Evidence Requests queue","Subfeature work items","Audit-ready output"],
+    metrics: [
+      { label: "Evidence Requests", value: "90", note: 'Active records' },
+      { label: 'Exceptions', value: "3", note: 'Need review' },
+      { label: 'Due Soon', value: "5", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "control-mapping",
+    title: "Control Mapping",
+    href: "/control-mapping",
+    category: "Compliance",
+    icon: Workflow,
+    summary: "Control Mapping workspace for regulatory obligations, control checks, evidence packets, deadlines, and audit-ready exports in Product Compliance Evidence Vault.",
+    bullets: ["Control Mapping queue","Subfeature work items","Audit-ready output"],
+    metrics: [
+      { label: "Control Mapping", value: "99", note: 'Active records' },
+      { label: 'Exceptions', value: "4", note: 'Need review' },
+      { label: 'Due Soon', value: "6", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "requirement-traceability",
+    title: "Requirement Traceability",
+    href: "/requirement-traceability",
+    category: "Governance",
+    icon: BarChart3,
+    summary: "Requirement Traceability workspace for approval routing, policy controls, ownership, exceptions, audit evidence, and management signoff in Product Compliance Evidence Vault.",
+    bullets: ["Requirement Traceability queue","Subfeature work items","Audit-ready output"],
+    metrics: [
+      { label: "Requirement Traceability", value: "108", note: 'Active records' },
+      { label: 'Exceptions', value: "5", note: 'Need review' },
+      { label: 'Due Soon', value: "7", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "attestation-packet-builder",
+    title: "Attestation Packet Builder",
+    href: "/attestation-packet-builder",
+    category: "Compliance",
+    icon: ClipboardList,
+    summary: "Attestation Packet Builder workspace for regulatory obligations, control checks, evidence packets, deadlines, and audit-ready exports in Product Compliance Evidence Vault.",
+    bullets: ["Attestation Packet Builder queue","Subfeature work items","Audit-ready output"],
+    metrics: [
+      { label: "Attestation Packet Builder", value: "117", note: 'Active records' },
+      { label: 'Exceptions', value: "6", note: 'Need review' },
+      { label: 'Due Soon', value: "8", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "expiration-monitoring",
+    title: "Expiration Monitoring",
+    href: "/expiration-monitoring",
+    category: "Operations",
+    icon: CalendarCheck,
+    summary: "Expiration Monitoring workspace for intake queues, assignments, SLA tracking, exception handling, stakeholder updates, and closeout evidence in Product Compliance Evidence Vault.",
+    bullets: ["Expiration Monitoring queue","Subfeature work items","Audit-ready output"],
+    metrics: [
+      { label: "Expiration Monitoring", value: "126", note: 'Active records' },
+      { label: 'Exceptions', value: "7", note: 'Need review' },
+      { label: 'Due Soon', value: "9", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "auditor-portal",
+    title: "Auditor Portal",
+    href: "/auditor-portal",
+    category: "Governance",
+    icon: PackageCheck,
+    summary: "Auditor Portal workspace for approval routing, policy controls, ownership, exceptions, audit evidence, and management signoff in Product Compliance Evidence Vault.",
+    bullets: ["Auditor Portal queue","Subfeature work items","Audit-ready output"],
+    metrics: [
+      { label: "Auditor Portal", value: "135", note: 'Active records' },
+      { label: 'Exceptions', value: "3", note: 'Need review' },
+      { label: 'Due Soon', value: "10", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "sku-compliance-matrix",
+    title: "SKU Compliance Matrix",
+    href: "/sku-compliance-matrix",
+    category: "Product",
+    icon: Activity,
+    summary: "SKU Compliance Matrix workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["SKU Compliance Matrix queue","Subfeature work items","Audit-ready output"],
+    metrics: [
+      { label: "SKU Compliance Matrix", value: "144", note: 'Active records' },
+      { label: 'Exceptions', value: "4", note: 'Need review' },
+      { label: 'Due Soon', value: "11", note: 'Next 14 days' },
+    ],
+  }
+] as const;
+
+const productionPlatformFeatures = [
+  {
+    slug: "enterprise-identity-access",
+    title: "Enterprise Identity & Access",
+    href: "/enterprise-identity-access",
+    category: "Production Platform",
+    icon: ShieldCheck,
+    summary: "Enterprise Identity & Access workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["Production controls","Evidence tracking","Launch readiness"],
+    metrics: [
+      { label: "Enterprise Identity & Access", value: "90", note: 'Active records' },
+      { label: 'Exceptions', value: "3", note: 'Need review' },
+      { label: 'Due Soon', value: "5", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "connector-operations-center",
+    title: "Connector Operations Center",
+    href: "/connector-operations-center",
+    category: "Production Platform",
+    icon: Workflow,
+    summary: "Connector Operations Center workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["Production controls","Evidence tracking","Launch readiness"],
+    metrics: [
+      { label: "Connector Operations Center", value: "99", note: 'Active records' },
+      { label: 'Exceptions', value: "4", note: 'Need review' },
+      { label: 'Due Soon', value: "6", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "audit-export-center",
+    title: "Audit Export Center",
+    href: "/audit-export-center",
+    category: "Production Platform",
+    icon: BarChart3,
+    summary: "Audit Export Center workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["Production controls","Evidence tracking","Launch readiness"],
+    metrics: [
+      { label: "Audit Export Center", value: "108", note: 'Active records' },
+      { label: 'Exceptions', value: "5", note: 'Need review' },
+      { label: 'Due Soon', value: "7", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "notification-delivery-ledger",
+    title: "Notification Delivery Ledger",
+    href: "/notification-delivery-ledger",
+    category: "Production Platform",
+    icon: ClipboardList,
+    summary: "Notification Delivery Ledger workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["Production controls","Evidence tracking","Launch readiness"],
+    metrics: [
+      { label: "Notification Delivery Ledger", value: "117", note: 'Active records' },
+      { label: 'Exceptions', value: "6", note: 'Need review' },
+      { label: 'Due Soon', value: "8", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "observability-runbooks",
+    title: "Observability & Runbooks",
+    href: "/observability-runbooks",
+    category: "Production Platform",
+    icon: CalendarCheck,
+    summary: "Observability & Runbooks workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["Production controls","Evidence tracking","Launch readiness"],
+    metrics: [
+      { label: "Observability & Runbooks", value: "126", note: 'Active records' },
+      { label: 'Exceptions', value: "7", note: 'Need review' },
+      { label: 'Due Soon', value: "9", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "release-test-harness",
+    title: "Release Test Harness",
+    href: "/release-test-harness",
+    category: "Production Platform",
+    icon: PackageCheck,
+    summary: "Release Test Harness workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["Production controls","Evidence tracking","Launch readiness"],
+    metrics: [
+      { label: "Release Test Harness", value: "135", note: 'Active records' },
+      { label: 'Exceptions', value: "3", note: 'Need review' },
+      { label: 'Due Soon', value: "10", note: 'Next 14 days' },
+    ],
+  },
+  {
+    slug: "production-gap-workspace",
+    title: "Production Gap Workspace",
+    href: "/production-gap-workspace",
+    category: "Production Platform",
+    icon: Activity,
+    summary: "Production Gap Workspace workspace for domain workflows, approvals, evidence, and reporting in Product Compliance Evidence Vault.",
+    bullets: ["Production controls","Evidence tracking","Launch readiness"],
+    metrics: [
+      { label: "Production Gap Workspace", value: "144", note: 'Active records' },
+      { label: 'Exceptions', value: "4", note: 'Need review' },
+      { label: 'Due Soon', value: "11", note: 'Next 14 days' },
+    ],
+  }
+] as const;
+
+const allFeatures = [...features, ...supplementalFeatures, ...productionPlatformFeatures, ...aiFeatures];
 
 export const primaryNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'All Features', href: '/features', icon: Blocks },
+  { label: 'Production Readiness', href: '/production-readiness', icon: ShieldCheck },
   { label: 'Documents', href: '/documents', icon: Files },
   { label: 'Source Tables', href: '/source-tables', icon: Database },
   { label: 'Profiles', href: '/profiles', icon: UserRound },
@@ -284,6 +487,8 @@ export const featureNav: NavItem[] = allFeatures.map((feature) => ({ label: feat
 export const featureCatalog: FeatureDefinition[] = allFeatures.map((feature) => ({ title: feature.title, href: feature.href, category: feature.category, summary: feature.summary, bullets: [...feature.bullets] }));
 
 export const featureFamilies = [
+  { name: 'Production Platform Controls', features: ['Enterprise Identity & Access', 'Connector Operations Center', 'Audit Export Center', 'Notification Delivery Ledger', 'Observability & Runbooks', 'Release Test Harness', 'Production Gap Workspace'] },
+  { name: "Evidence Vault Controls", features: ["Evidence Requests","Control Mapping","Requirement Traceability","Attestation Packet Builder","Expiration Monitoring","Auditor Portal","SKU Compliance Matrix"] },
   {
     "name": "Evidence",
     "features": [
@@ -369,7 +574,7 @@ function toPage(feature: (typeof allFeatures)[number]): PageDefinition {
   };
 }
 
-export const pageRegistry: Record<string, PageDefinition> = Object.fromEntries(features.map((feature) => [feature.slug, toPage(feature)]));
+export const pageRegistry: Record<string, PageDefinition> = Object.fromEntries([...features, ...supplementalFeatures, ...productionPlatformFeatures].map((feature) => [feature.slug, toPage(feature)]));
 export const aiFeatureRegistry: Record<string, PageDefinition> = Object.fromEntries(aiFeatures.map((feature) => [feature.slug, toPage(feature)]));
 export const featureContexts: Record<string, FeatureContext> = Object.fromEntries(
   allFeatures.map((feature) => [

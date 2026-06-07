@@ -1,145 +1,43 @@
+import { featureCatalog } from '@/lib/unifiedApp';
+
 export type FeatureSurfaceRow = { id: string; item: string; status: string; owner: string; nextStep: string };
-export type FeatureSurface = {
-  workItems: FeatureSurfaceRow[];
-  quickActions: string[];
-  controlChecks: Array<{ id: string; label: string; done: boolean }>;
-  activityLog: Array<{ id: string; message: string; at: string }>;
-};
-
-const featureSeeds = [
-  [
-    "evidence-vault",
-    "Evidence Vault",
-    "Evidence Vault operating queue",
-    "Evidence Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "model-card-registry",
-    "Model Card Registry",
-    "Model Card Registry operating queue",
-    "AI Governance Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "release-approval-history",
-    "Release Approval History",
-    "Release Approval History operating queue",
-    "Release Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "security-test-evidence",
-    "Security Test Evidence",
-    "Security Test Evidence operating queue",
-    "Security Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "privacy-review-evidence",
-    "Privacy Review Evidence",
-    "Privacy Review Evidence operating queue",
-    "Privacy Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "ai-evaluation-records",
-    "AI Evaluation Records",
-    "AI Evaluation Records operating queue",
-    "AI Governance Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "control-crosswalk",
-    "Control Crosswalk",
-    "Control Crosswalk operating queue",
-    "Controls Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "customer-audit-packets",
-    "Customer Audit Packets",
-    "Customer Audit Packets operating queue",
-    "Customer Trust Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "exception-register",
-    "Exception Register",
-    "Exception Register operating queue",
-    "Risk Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "compliance-dashboard",
-    "Compliance Dashboard",
-    "Compliance Dashboard operating queue",
-    "Reporting Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "documents",
-    "Documents",
-    "Documents operating queue",
-    "Core Platform Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "notifications",
-    "Notifications",
-    "Notifications operating queue",
-    "Core Platform Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "integrations",
-    "Integrations",
-    "Integrations operating queue",
-    "Core Platform Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "profiles",
-    "Profiles",
-    "Profiles operating queue",
-    "Core Platform Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "ai-assistant",
-    "AI Assistant",
-    "AI Assistant operating queue",
-    "Intelligence Layer Lead",
-    "Review evidence, assign owner, and record next action"
-  ],
-  [
-    "ai-tools",
-    "AI Tools",
-    "AI Tools operating queue",
-    "Intelligence Layer Lead",
-    "Review evidence, assign owner, and record next action"
-  ]
-] as const;
-
-function buildSurface(slug: string, title: string, item: string, owner: string, nextStep: string): FeatureSurface {
+export type FeatureSurface = { workItems: FeatureSurfaceRow[]; quickActions: string[]; controlChecks: Array<{ id: string; label: string; done: boolean }>; activityLog: Array<{ id: string; message: string; at: string }> };
+function slugFromHref(href: string) { return href.split('/').filter(Boolean).pop() ?? href.replace(/^\//, ''); }
+function ownerFor(category: string) {
+  const lower = category.toLowerCase();
+  if (lower.includes('compliance') || lower.includes('legal')) return 'Compliance Lead';
+  if (lower.includes('governance') || lower.includes('risk')) return 'Governance Lead';
+  if (lower.includes('finance')) return 'Finance Lead';
+  if (lower.includes('quality') || lower.includes('reliability')) return 'Quality Lead';
+  if (lower.includes('safety')) return 'Safety Lead';
+  if (lower.includes('platform')) return 'Platform Lead';
+  return 'Operations Lead';
+}
+function buildSurface(slug: string, title: string, category: string): FeatureSurface {
+  const owner = ownerFor(category);
   return {
     workItems: [
-      { id: `${slug}-1`, item, status: 'Open', owner, nextStep },
-      { id: `${slug}-2`, item: `${title} exception review`, status: 'Review', owner: 'Operations', nextStep: 'Investigate exception and assign owner' },
-      { id: `${slug}-3`, item: `${title} weekly operating queue`, status: 'Queued', owner: 'Team Lead', nextStep: 'Prioritize next actions' },
+      { id: slug + '-surface-1', item: title + ' intake queue', status: 'Open', owner, nextStep: 'Validate source data, owner, deadline, and business impact' },
+      { id: slug + '-surface-2', item: title + ' evidence and policy review', status: 'Review', owner: 'Specialist Reviewer', nextStep: 'Confirm documents, rules, approvals, and exception rationale' },
+      { id: slug + '-surface-3', item: title + ' connector follow-up', status: 'Needs attention', owner: 'Integration Lead', nextStep: 'Check source connector, payload quality, and sync status' },
+      { id: slug + '-surface-4', item: title + ' SLA escalation', status: 'Urgent', owner: 'Operations Manager', nextStep: 'Escalate delayed, high-value, or customer-impacting work' },
+      { id: slug + '-surface-5', item: title + ' audit closeout', status: 'In progress', owner: 'Team Lead', nextStep: 'Capture decision, evidence, approval trail, and export packet' },
     ],
-    quickActions: [`Create ${title} record`, `Export ${title} list`, `Review ${title} exceptions`],
+    quickActions: ['Create ' + title + ' record', 'Export ' + title + ' list', 'Review ' + title + ' exceptions', 'Assign ' + title + ' owner'],
     controlChecks: [
-      { id: `${slug}-check-1`, label: `${title} owner assigned`, done: true },
-      { id: `${slug}-check-2`, label: `${title} next step documented`, done: false },
-      { id: `${slug}-check-3`, label: `${title} audit trail current`, done: true },
+      { id: slug + '-check-1', label: title + ' owner assigned', done: true },
+      { id: slug + '-check-2', label: title + ' evidence and source data reviewed', done: false },
+      { id: slug + '-check-3', label: title + ' audit trail current', done: true },
+      { id: slug + '-check-4', label: title + ' approval or escalation logged', done: false },
     ],
     activityLog: [
-      { id: `${slug}-log-1`, message: `${title} queue refreshed`, at: '2026-05-29 09:00' },
-      { id: `${slug}-log-2`, message: `${title} exception assigned`, at: '2026-05-29 11:30' },
+      { id: slug + '-log-1', message: title + ' queue refreshed', at: '2026-06-06 09:00' },
+      { id: slug + '-log-2', message: title + ' exception assigned', at: '2026-06-06 11:30' },
+      { id: slug + '-log-3', message: title + ' controls reviewed', at: '2026-06-06 14:15' },
     ],
   };
 }
-
-export const featureSurfaceBySlug: Record<string, FeatureSurface> = Object.fromEntries(featureSeeds.map(([slug, title, item, owner, nextStep]) => [slug, buildSurface(slug, title, item, owner, nextStep)]));
-export const featureSurfaces: Record<string, FeatureSurface> = Object.fromEntries(featureSeeds.map(([slug, title]) => [title, featureSurfaceBySlug[slug]]));
+export const featureSurfaceBySlug: Record<string, FeatureSurface> = Object.fromEntries(featureCatalog.map((feature) => {
+  const slug = slugFromHref(feature.href); return [slug, buildSurface(slug, feature.title, feature.category)];
+}));
+export const featureSurfaces: Record<string, FeatureSurface> = Object.fromEntries(featureCatalog.map((feature) => [feature.title, featureSurfaceBySlug[slugFromHref(feature.href)]]));
