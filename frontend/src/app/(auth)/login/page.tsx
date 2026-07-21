@@ -3,13 +3,13 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { demoUser, demoUsers } from '@/lib/auth';
 
 export default function LoginPage() {
+  const isProduction = process.env.NODE_ENV === 'production';
   const router = useRouter();
   const { ready, user, login } = useAuth();
-  const [email, setEmail] = useState(demoUser.email);
-  const [password, setPassword] = useState(demoUser.password);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function LoginPage() {
     const ok = await login(email, password);
     setSubmitting(false);
     if (!ok) {
-      setError('Use the seeded AI Agent Ops demo credentials.');
+      setError('The email, password, or tenant configuration was not accepted.');
       return;
     }
     router.push('/dashboard');
@@ -41,7 +41,9 @@ export default function LoginPage() {
           One login for ai agent ops features, source tables, documents, notifications, audit, approvals, and AI operations.
         </div>
 
-        <form onSubmit={onSubmit}>
+        {isProduction ? (
+          <a className="button primary" href="/api/auth/oidc/start" style={{ display: 'inline-block', marginTop: 20 }}>Sign in with enterprise SSO</a>
+        ) : <form onSubmit={onSubmit}>
           <label>
             Email
             <input value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -53,18 +55,11 @@ export default function LoginPage() {
           <button className="button primary" type="submit" disabled={submitting}>
             {submitting ? 'Signing in...' : 'Sign in'}
           </button>
-        </form>
+        </form>}
 
         {error ? <div style={{ color: '#b91c1c', marginTop: 14 }}>{error}</div> : null}
 
-        <div className="hint">
-          Seeded suite users:
-          {demoUsers.map((user) => (
-            <div key={user.email} style={{ marginTop: 8 }}>
-              <strong>{user.role}</strong>: {user.email} / {user.password}
-            </div>
-          ))}
-        </div>
+        {!isProduction ? <div className="hint">Use an explicitly provisioned local identity. Credentials are never embedded in the client bundle.</div> : null}
       </div>
     </div>
   );

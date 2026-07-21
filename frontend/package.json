@@ -7,20 +7,26 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "smoke:governed": "node scripts/governed-smoke.mjs",
+    "create-admin": "node ../backend/scripts/create-admin.mjs",
+    "test:governance": "node --test ../governance/*.test.cjs && tsx --test src/lib/oidc.test.ts",
+    "check": "npm run typecheck && npm run test:governance && npm run build"
   },
   "dependencies": {
     "@types/node": "20.11.5",
     "@types/react": "18.2.48",
     "@types/react-dom": "18.2.18",
     "lucide-react": "^0.468.0",
-    "next": "14.0.4",
+    "next": "^15.5.20",
+    "jose": "^5.10.0",
     "pg": "^8.16.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "typescript": "5.3.3"
   },
   "devDependencies": {
-    "@types/pg": "^8.15.5"
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.3"
   }
 }

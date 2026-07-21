@@ -1,0 +1,17 @@
+const base = process.env.SMOKE_BASE_URL || 'http://127.0.0.1:5207';
+const smokePassword = process.env.SMOKE_PASSWORD;
+if (!smokePassword) throw new Error('SMOKE_PASSWORD is required');
+async function login(email, password) { const response = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response.ok) throw new Error(`login ${response.status}`); return response.headers.get('set-cookie').split(';')[0]; }
+async function call(cookie, method, body) { const response = await fetch(`${base}/api/governed/compliance`, { method, headers: { cookie, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); const text = await response.text(); const data = text ? JSON.parse(text) : {}; if (!response.ok) throw new Error(`${method} ${response.status} ${JSON.stringify(data)}`); return data; }
+async function status(cookie, method, body) { return (await fetch(`${base}/api/governed/compliance`, { method, headers: { cookie, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })).status; }
+const analyst = await login(process.env.SMOKE_ANALYST_EMAIL || 'analyst@product-evidence.local', smokePassword); const manager = await login(process.env.SMOKE_MANAGER_EMAIL || 'manager@product-evidence.local', smokePassword); const admin = await login(process.env.SMOKE_ADMIN_EMAIL || 'admin@product-evidence.local', smokePassword);
+const unique = Date.now().toString();
+const source = await call(analyst, 'POST', { action: 'ingest_source', sourceId: `reg-${unique}`, sourceUri: 'https://regulator.example/rule', publisher: 'Regulator', jurisdiction: 'US', effectiveAt: '2026-08-01T00:00:00Z', retrievedAt: '2026-07-19T00:00:00Z', sourceVersion: 'v1', content: { rule: 'must' } });
+const policy = await call(analyst, 'POST', { policyKey: `POL-${unique}`, title: 'Release policy', ownerId: 'owner@example.test', body: { control: 'required' }, evidenceSourceIds: [source.id] });
+if (await status(manager, 'POST', { action: 'ingest_source' }) !== 403) throw new Error('authoring RBAC failure path did not reject manager');
+if (await status(analyst, 'GET') !== 403) throw new Error('audit export RBAC failure path did not reject analyst');
+const recordsControl = await call(admin, 'PATCH', { id: policy.id, action: 'set_records_control', legalHold: true, retainUntil: '2028-01-01T00:00:00Z', rationale: 'Preserve evidence for active legal matter' }); if (!recordsControl.legal_hold) throw new Error('legal hold was not persisted');
+const evaluation = await call(analyst, 'POST', { action: 'evaluate', policyVersionId: policy.id, scenarioId: 'release', citations: [{ sourceUri: source.source_uri, locator: '§1' }], obligations: [{ ownerId: 'owner@example.test', deadline: '2026-07-31T00:00:00Z', riskRating: 'high' }] }); if (!evaluation.passed) throw new Error('evaluation did not pass');
+await call(analyst, 'PATCH', { id: policy.id, toStatus: 'evidence_review', rationale: 'Evidence is ready' }); await call(manager, 'PATCH', { id: policy.id, toStatus: 'approval_pending', rationale: 'Independent review complete' }); await call(admin, 'PATCH', { id: policy.id, toStatus: 'approved', rationale: 'Approval criteria satisfied' });
+const exported = await call(manager, 'GET'); if (!exported.records.some(record => record.policy_version_id === policy.id)) throw new Error('decision missing from audit export');
+console.log('Governed compliance API smoke passed');

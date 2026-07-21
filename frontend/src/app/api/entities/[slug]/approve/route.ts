@@ -3,7 +3,7 @@ import { appendAuditEntry } from '@/lib/auditStore';
 import { getEntitySet, saveEntitySet } from '@/lib/entityStore';
 import { requireApprover } from '@/lib/requestAuth';
 
-export async function POST(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const session = requireApprover(request);
   if (session instanceof NextResponse) return session;
 
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
     return NextResponse.json({ error: 'rowId is required' }, { status: 400 });
   }
 
-  const set = await getEntitySet(params.slug);
+  const set = await getEntitySet((await params).slug);
   if (!set) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
   }
 
   row.status = approved ? 'Approved' : 'Rejected';
-  await saveEntitySet(params.slug, set);
-  await appendAuditEntry(params.slug, `${approved ? 'Approved' : 'Rejected'} record: ${row.name}`);
+  await saveEntitySet((await params).slug, set);
+  await appendAuditEntry((await params).slug, `${approved ? 'Approved' : 'Rejected'} record: ${row.name}`);
   return NextResponse.json({ ok: true, row });
 }

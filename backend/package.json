@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "db:migrate": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f ../frontend/migrations/001_compliance_vault.sql",
+    "create-admin": "node scripts/create-admin.mjs",
     "typecheck": "cd ../frontend && npm run typecheck",
     "smoke": "cd ../frontend && npm run smoke",
     "dev": "cd ../frontend && npm run dev"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
   },
   "notes": "Backend API routes are exposed here and executed by the Next.js full-stack runtime."
 }
