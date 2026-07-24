@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { aiTools, getAITool } from '@/lib/aiTools';
 import { appendAuditEntry } from '@/lib/auditStore';
 import { requireSession } from '@/lib/requestAuth';
+import { ensurePostgres } from '@/lib/postgres';
 
 async function callConfiguredAI(system: string, prompt: string) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-
-  const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const baseUrl = process.env.OPENROUTER_BASE_URL;
+  const model = process.env.OPENROUTER_MODEL;
+  if (!apiKey || !baseUrl || !model) throw new Error('OpenRouter configuration is required');
   const response = await fetch(baseUrl + '/chat/completions', {
     method: 'POST',
     headers: {
@@ -30,20 +30,9 @@ async function callConfiguredAI(system: string, prompt: string) {
   }
 
   const payload = await response.json();
-  return payload?.choices?.[0]?.message?.content as string | undefined;
-}
-
-function localResponse(toolTitle: string, prompt: string, signals: string[]) {
-  const trimmedPrompt = prompt.trim();
-  return [
-    toolTitle + ' response',
-    '',
-    'Summary: ' + trimmedPrompt.slice(0, 260) + (trimmedPrompt.length > 260 ? '...' : ''),
-    '',
-    'Recommended next actions:',
-    ...signals.slice(0, 4).map((signal, index) => String(index + 1) + '. Review ' + signal + ' and assign an owner.'),
-    String(Math.min(signals.length + 1, 5)) + '. Update the audit trail after the review is accepted.',
-  ].join('\n');
+  const content = payload?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) throw new Error('OpenRouter returned empty content');
+  return content;
 }
 
 export async function GET(request: NextRequest) {
@@ -57,20 +46,19 @@ export async function POST(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   const body = await request.json().catch(() => null) as { toolId?: string; input?: string } | null;
+  if (!body?.input?.trim()) return NextResponse.json({ error: 'input is required' }, { status: 400 });
   const tool = getAITool(body?.toolId || 'suite-assistant');
-  const input = body?.input?.trim() || tool.defaultPrompt;
+  const input = body.input.trim();
   const system = 'You are ' + tool.title + '. Stay inside this suite workflow. Return concise operational guidance with risks, next actions, and audit notes.';
 
-  let response: string;
-  let provider = 'local-pilot';
-  try {
-    const aiResponse = await callConfiguredAI(system, input);
-    response = aiResponse || localResponse(tool.title, input, tool.signals);
-    provider = aiResponse ? 'configured-ai' : provider;
-  } catch {
-    response = localResponse(tool.title, input, tool.signals);
-    provider = 'local-fallback';
-  }
+  const response = await callConfiguredAI(system, input);
+  const model = process.env.OPENROUTER_MODEL || '';
+  const db = await ensurePostgres();
+  const persisted = await db.query(
+    `INSERT INTO compliance_ai_results(tenant_id,identity_email,feature,input,output,model)
+     VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [session.tenantId, session.email, tool.id, input, response, model],
+  );
 
   await appendAuditEntry('AI Tools', ((session.firstName + ' ' + session.lastName).trim() || session.email) + ' ran ' + tool.title);
 
@@ -78,7 +66,9 @@ export async function POST(request: NextRequest) {
     tool,
     input,
     response,
-    provider,
+    id: persisted.rows[0].id,
+    provider: 'openrouter',
+    model,
     createdAt: new Date().toISOString(),
   });
 }
