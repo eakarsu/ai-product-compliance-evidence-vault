@@ -888,6 +888,87 @@ textarea {
   margin-bottom: 8px;
 }
 
+.ai-report-table-wrap {
+  margin-top: 10px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.ai-report-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ai-report-table th,
+.ai-report-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.ai-report-table th {
+  background: var(--panel-muted);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-report-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ai-saved-results {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+
+.ai-saved-results h4,
+.ai-saved-results p {
+  margin: 0;
+}
+
+.ai-saved-result-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.ai-saved-result-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-saved-result-card:hover,
+.ai-saved-result-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ai-saved-result-card span,
+.ai-saved-result-card small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 @media (max-width: 900px) {
   .ai-report-scoregrid,
   .ai-field-recap-grid {

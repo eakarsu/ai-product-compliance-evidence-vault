@@ -1,19 +1,23 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiTools, type AIToolDefinition } from '@/lib/aiTools';
 import { sourceAIToolFieldsByToolId, type SourceAIToolField } from '@/lib/sourceAIToolFields';
+import JsonReport from '@/components/JsonReport';
 
 type AIWorkbenchProps = {
   mode?: 'assistant' | 'tools';
 };
 
 type AIResult = {
+  id?: string;
   tool: AIToolDefinition;
   input: string;
   response: string;
   provider: string;
+  model?: string;
   createdAt: string;
+  saved?: boolean;
 };
 
 type PresetDefinition = {
@@ -23,13 +27,19 @@ type PresetDefinition = {
   buildPrompt: (tool: AIToolDefinition) => string;
 };
 
+type ParsedTable = {
+  columns: string[];
+  rows: string[][];
+};
+
 type ParsedSection = {
   title: string;
   paragraphs: string[];
   bullets: string[];
+  table?: ParsedTable;
 };
 
-const promptPresets: PresetDefinition[] = [
+export const promptPresets: PresetDefinition[] = [
   {
     id: 'executive-summary',
     label: 'Executive Summary',
@@ -64,20 +74,28 @@ function buildFieldValues(fields: SourceAIToolField[]) {
   return Object.fromEntries(fields.map((field) => [field.name, field.defaultValue || '']));
 }
 
-function sampleForField(field: SourceAIToolField, tool: AIToolDefinition) {
-  if (field.options.length) return field.options[0];
-  const lower = field.name.toLowerCase();
-  if (lower.includes('name')) return tool.title.replace(/ AI Tools| Source Workflow| Copilot/g, '');
-  if (lower.includes('language')) return 'English';
-  if (lower.includes('voice')) return 'Professional';
-  if (lower.includes('industry')) return 'General Business';
-  if (lower.includes('duration')) return '300';
-  if (lower.includes('phone') || lower.includes('number') || lower.includes('transfer')) return '+1 555 010 0100';
-  if (lower.includes('query')) return 'What is the best next response for this customer?';
-  if (lower.includes('context')) return 'Customer is asking for help and needs a concise, professional answer.';
-  if (lower.includes('greeting')) return 'Hello, thank you for calling. How can I help you today?';
-  if (lower.includes('prompt') || lower.includes('script')) return 'You are a professional assistant. Be concise, accurate, helpful, and compliant.';
-  return field.defaultValue || 'Sample value';
+function sampleForField(field: SourceAIToolField, tool: AIToolDefinition, profile = 0) {
+  const safeProfile = Math.max(0, profile % promptPresets.length);
+  if (field.options.length) return field.options[safeProfile % field.options.length];
+  if (field.type === 'checkbox') return safeProfile % 2 === 0 ? 'true' : 'false';
+  if (field.type === 'number' || field.type === 'range') return String(25 + safeProfile * 5);
+  if (field.type === 'date') return ['2026-10-15', '2026-10-22', '2026-10-29', '2026-11-05'][safeProfile];
+  if (field.type === 'datetime-local') return ['2026-10-15T09:30', '2026-10-22T11:00', '2026-10-29T14:30', '2026-11-05T16:00'][safeProfile];
+  if (field.type === 'email') return 'compliance.owner@example.com';
+  if (field.type === 'url') return 'https://example.com/evidence/reference-' + String(safeProfile + 1);
+  if (field.type === 'tel') return '+1 555 010 0100';
+  if (field.type === 'file') return 'controlled-fixture-evidence-' + String(safeProfile + 1) + '.pdf';
+  if (field.name === 'objective') return promptPresets[safeProfile].buildPrompt(tool);
+  if (field.name === 'source_context') return 'Fictional, deidentified planning context for ' + tool.title + '. ' + ['Prepare a status review and identify evidence that is still needed.', 'Review potential risks without asserting unsupported incidents or completed controls.', 'Propose owner follow-up and validation steps; decisions require authorized review.', 'Prepare a staged implementation proposal with testing and approval checkpoints.'][safeProfile];
+  return field.defaultValue || 'Proposed ' + field.label + ' for review; confirm source facts before use.';
+}
+
+export function buildPresetExample(presetIndex: number, tool: AIToolDefinition, fields: SourceAIToolField[]) {
+  const safeIndex = Math.max(0, Math.min(promptPresets.length - 1, presetIndex));
+  return {
+    input: promptPresets[safeIndex].buildPrompt(tool),
+    fieldValues: Object.fromEntries(fields.map((field) => [field.name, sampleForField(field, tool, safeIndex)])),
+  };
 }
 
 function formatInput(prompt: string, fields: SourceAIToolField[], values: Record<string, string>) {
@@ -130,16 +148,27 @@ function readableValue(value: unknown): string {
   if (value == null) return 'Not provided';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number') return String(value);
-  if (typeof value === 'string') return value.replace(/\*\*/g, '').replace(/`/g, '').trim();
+  if (typeof value === 'string') { const parsed = parseStructuredResponse(value); return typeof parsed === 'string' ? parsed.replace(/\*\*/g, '').replace(/`/g, '').trim() : readableValue(parsed); }
   if (Array.isArray(value)) return value.map(readableValue).join('; ');
   return Object.entries(value as Record<string, unknown>)
     .map(([key, item]) => sectionLabel(key) + ': ' + readableValue(item))
     .join(' · ');
 }
 
-function sectionsFromObject(value: unknown): ParsedSection[] {
+function tableFromItems(value: unknown[]): ParsedTable | undefined {
+  if (!value.length || !value.every((item) => item && typeof item === 'object' && !Array.isArray(item))) return undefined;
+  const columns = Array.from(new Set(value.flatMap((item) => Object.keys(item as Record<string, unknown>))));
+  if (!columns.length) return undefined;
+  return {
+    columns,
+    rows: value.map((item) => columns.map((column) => readableValue((item as Record<string, unknown>)[column]))),
+  };
+}
+
+export function sectionsFromObject(value: unknown): ParsedSection[] {
   if (Array.isArray(value)) {
-    return [{ title: 'AI Analysis', paragraphs: [], bullets: value.map(readableValue) }];
+    const table = tableFromItems(value);
+    return [{ title: 'AI Analysis', paragraphs: [], bullets: table ? [] : value.map(readableValue), table }];
   }
   if (!value || typeof value !== 'object') return [];
 
@@ -171,7 +200,10 @@ function sectionsFromObject(value: unknown): ParsedSection[] {
         const rating = percent === null ? '' : percent >= 80 ? 'High' : percent >= 55 ? 'Moderate' : 'Needs review';
         return { title: sectionLabel(key), paragraphs: [percent === null ? readableValue(item) : percent + '% · ' + rating], bullets: [] };
       }
-      if (Array.isArray(item)) return { title: sectionLabel(key), paragraphs: [], bullets: item.map(readableValue) };
+      if (Array.isArray(item)) {
+        const table = tableFromItems(item);
+        return { title: sectionLabel(key), paragraphs: [], bullets: table ? [] : item.map(readableValue), table };
+      }
       if (item && typeof item === 'object') {
         return { title: sectionLabel(key), paragraphs: [], bullets: Object.entries(item as Record<string, unknown>).map(([childKey, child]) => sectionLabel(childKey) + ': ' + readableValue(child)) };
       }
@@ -179,7 +211,7 @@ function sectionsFromObject(value: unknown): ParsedSection[] {
     });
 }
 
-function parseAIResponse(response: string): ParsedSection[] {
+export function parseAIResponse(response: string): ParsedSection[] {
   const structured = parseStructuredResponse(response);
   if (structured && typeof structured === 'object') {
     const sections = sectionsFromObject(structured);
@@ -247,6 +279,11 @@ function plainResult(result: AIResult, sections: ParsedSection[]) {
       '## ' + section.title,
       ...section.paragraphs,
       ...section.bullets.map((bullet) => '- ' + bullet),
+      ...(section.table ? [
+        '| ' + section.table.columns.map(sectionLabel).join(' | ') + ' |',
+        '| ' + section.table.columns.map(() => '---').join(' | ') + ' |',
+        ...section.table.rows.map((row) => '| ' + row.map((cell) => cell.replace(/\|/g, '\\|')).join(' | ') + ' |'),
+      ] : []),
       '',
     ]),
   ].join('\n');
@@ -259,14 +296,19 @@ type FieldSnapshot = {
   required?: boolean;
 };
 
-function buildFieldSnapshot(fields: SourceAIToolField[], values: Record<string, string>): FieldSnapshot[] {
+function buildFieldSnapshot(fields: SourceAIToolField[], values: Record<string, string>, input: string): FieldSnapshot[] {
+  const structuredInput = input.split(/\n\nStructured fields:\n/i)[1] || '';
   return fields
-    .map((field) => ({
-      label: field.label,
-      value: values[field.name] || '',
-      source: field.source,
-      required: field.required,
-    }))
+    .map((field) => {
+      const prefix = field.label + ': ';
+      const savedValue = structuredInput.split('\n').find((line) => line.startsWith(prefix))?.slice(prefix.length) || '';
+      return {
+        label: field.label,
+        value: values[field.name] || savedValue,
+        source: field.source,
+        required: field.required,
+      };
+    })
     .filter((field) => String(field.value || '').trim())
     .slice(0, 18);
 }
@@ -282,11 +324,12 @@ function AIResultReport({
 }) {
   const sections = parseAIResponse(result.response);
   const createdAt = new Date(result.createdAt).toLocaleString();
-  const fieldSnapshot = buildFieldSnapshot(fields, fieldValues);
+  const fieldSnapshot = buildFieldSnapshot(fields, fieldValues, result.input);
   const riskCount = sections.filter((section) => classifySection(section.title) === 'risk').length;
   const actionCount = sections.reduce((sum, section) => sum + (classifySection(section.title) === 'action' ? Math.max(section.bullets.length, 1) : 0), 0);
   const auditCount = sections.filter((section) => classifySection(section.title) === 'audit').length;
   const copyText = plainResult(result, sections);
+  const [showJson, setShowJson] = useState(false);
 
   const copyReport = async () => {
     await navigator.clipboard?.writeText(copyText);
@@ -306,7 +349,7 @@ function AIResultReport({
     <div className="ai-report pro">
       <div className="ai-report-header pro">
         <div>
-          <div className="pill">AI Result Report</div>
+          <div className="pill">{result.saved ? 'Saved AI Result' : 'AI Result Report'}</div>
           <h4>{result.tool.title}</h4>
           <div className="muted">Provider: {result.provider} · {createdAt}</div>
         </div>
@@ -314,6 +357,7 @@ function AIResultReport({
           <div className="ai-report-badge">{result.tool.category}</div>
           <button className="button subtle" type="button" onClick={copyReport}>Copy</button>
           <button className="button subtle" type="button" onClick={downloadReport}>Export MD</button>
+          <button className="button subtle" type="button" aria-pressed={showJson} onClick={() => setShowJson((value) => !value)}>{showJson ? 'Formatted report' : 'JSON view'}</button>
         </div>
       </div>
 
@@ -365,6 +409,12 @@ function AIResultReport({
         <p>{result.input}</p>
       </details>
 
+      {showJson ? (
+        <div className="ai-report-json pro">
+          <JsonReport data={result.response} title={result.tool.title + ' — structured JSON'} model={result.model} />
+        </div>
+      ) : null}
+
       <div className="ai-report-sections pro">
         {sections.map((section, index) => {
           const kind = classifySection(section.title);
@@ -381,6 +431,20 @@ function AIResultReport({
                     <li key={bulletIndex}>{bullet}</li>
                   ))}
                 </ul>
+              ) : null}
+              {section.table ? (
+                <div className="ai-report-table-wrap">
+                  <table className="ai-report-table">
+                    <thead>
+                      <tr>{section.table.columns.map((column) => <th key={column}>{sectionLabel(column)}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {section.table.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : null}
             </section>
           );
@@ -445,10 +509,30 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
   const [input, setInput] = useState(selectedTool.defaultPrompt);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(() => buildFieldValues(sourceAIToolFieldsByToolId[initialTool.id] || []));
   const [result, setResult] = useState<AIResult | null>(null);
+  const [savedResults, setSavedResults] = useState<AIResult[]>([]);
+  const [historyError, setHistoryError] = useState('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => () => { request.current?.abort(); request.current = null; }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/ai-tools/run?limit=12', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Saved AI results are unavailable.');
+        setSavedResults(Array.isArray(payload.results) ? payload.results : []);
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted) setHistoryError(reason instanceof Error ? reason.message : 'Saved AI results are unavailable.');
+      });
+    return () => controller.abort();
+  }, []);
+  const cancelRequest = () => { request.current?.abort(); request.current = null; setRunning(false); setResult(null); setError(''); setStatus('Request canceled. Your inputs are ready to edit.'); };
 
   const selectTool = (tool: AIToolDefinition) => {
+    request.current?.abort(); request.current = null; setRunning(false); setStatus('');
     setSelectedToolId(tool.id);
     setInput(tool.defaultPrompt);
     setFieldValues(buildFieldValues(sourceAIToolFieldsByToolId[tool.id] || []));
@@ -457,7 +541,10 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
   };
 
   const applyPreset = (preset: PresetDefinition) => {
-    setInput(preset.buildPrompt(selectedTool));
+    const example = buildPresetExample(promptPresets.indexOf(preset), selectedTool, selectedFields);
+    setInput(example.input);
+    setFieldValues(example.fieldValues);
+    setStatus('Every active input is filled, including optional fields. Review this planning example before generating.');
     setResult(null);
     setError('');
   };
@@ -473,8 +560,8 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
     setError('');
   };
 
-  const fillDefaults = () => setFieldValues(buildFieldValues(selectedFields));
-  const fillSamples = () => setFieldValues(Object.fromEntries(selectedFields.map((field) => [field.name, sampleForField(field, selectedTool)])));
+  const fillDefaults = () => { setInput(selectedTool.defaultPrompt); setFieldValues(buildFieldValues(selectedFields)); setResult(null); setError(''); };
+  const fillSamples = () => applyPreset(promptPresets[0]);
   const clearFields = () => setFieldValues(Object.fromEntries(selectedFields.map((field) => [field.name, ''])));
 
   const updateField = (name: string, value: string) => {
@@ -484,21 +571,30 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
   };
 
   const runTool = async () => {
+    if (request.current) return;
+    const missing = selectedFields.find(field => field.required && !String(fieldValues[field.name] || '').trim());
+    if (missing || !input.trim()) { setError(missing ? missing.label + ' is required.' : 'Enter a question or context.'); return; }
+    const controller = new AbortController(); request.current = controller; setStatus(''); setResult(null);
     const requestInput = formatInput(input, selectedFields, fieldValues);
     setRunning(true);
     setError('');
     try {
       const response = await fetch('/api/ai-tools/run', {
-        method: 'POST',
+        method: 'POST', signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ toolId: selectedTool.id, input: requestInput, fields: fieldValues }),
       });
-      if (!response.ok) throw new Error('AI tool failed with ' + response.status);
-      setResult(await response.json());
+      const data = await response.json();
+      if (controller.signal.aborted) return;
+      if (!response.ok) throw new Error(data.error || 'The AI report could not complete.');
+      const completed = data as AIResult;
+      setResult(completed);
+      setSavedResults((current) => [{ ...completed, saved: true }, ...current.filter((item) => item.id !== completed.id)].slice(0, 12));
+      setHistoryError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'AI tool failed');
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'AI tool failed');
     } finally {
-      setRunning(false);
+      if (request.current === controller) { request.current = null; setRunning(false); }
     }
   };
 
@@ -511,13 +607,15 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
           <div className="muted">Cards are generated from this suite&apos;s merged capabilities, source systems, and extracted donor AI fields.</div>
         </div>
         <button className="button primary" type="button" onClick={runTool} disabled={running}>
-          {running ? 'Sending...' : 'Send AI Request'}
+          {running ? 'Generating…' : 'Generate with OpenRouter'}
         </button>
+        {running && <button type="button" className="button secondary" onClick={cancelRequest}>Cancel request</button>}
       </div>
+      {status && <p role="status" className="muted">{status}</p>}
 
       <div className="ai-tool-grid">
         {aiTools.map((tool) => (
-          <button key={tool.id} type="button" className={tool.id === selectedTool.id ? 'ai-tool-card active' : 'ai-tool-card'} onClick={() => selectTool(tool)}>
+          <button key={tool.id} data-tool-id={tool.id} type="button" className={tool.id === selectedTool.id ? 'ai-tool-card active' : 'ai-tool-card'} onClick={() => selectTool(tool)}>
             <span className="ai-tool-category">{tool.category}</span>
             <strong>{tool.title}</strong>
             <span>{tool.description}</span>
@@ -532,7 +630,7 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
           <div className="ai-preset-panel">
             <div className="ai-preset-grid">
               {promptPresets.map((preset) => (
-                <button key={preset.id} className="ai-preset-button" type="button" onClick={() => applyPreset(preset)}>
+                <button key={preset.id} className="ai-preset-button" type="button" disabled={running} onClick={() => applyPreset(preset)}>
                   <strong>{preset.label}</strong>
                   <span>{preset.description}</span>
                 </button>
@@ -541,7 +639,7 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
             {selectedTool.signals.length ? (
               <div className="ai-signal-row">
                 {selectedTool.signals.slice(0, 8).map((signal) => (
-                  <button key={signal} className="tag-link" type="button" onClick={() => applySignal(signal)}>
+                  <button key={signal} className="tag-link" type="button" disabled={running} onClick={() => applySignal(signal)}>
                     {signal}
                   </button>
                 ))}
@@ -557,30 +655,32 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
                   <div className="muted">{selectedFields.length} donor fields mapped for this tool.</div>
                 </div>
                 <div className="inline-links">
-                  <button className="button subtle" type="button" onClick={fillDefaults}>Defaults</button>
-                  <button className="button subtle" type="button" onClick={fillSamples}>Fill Samples</button>
-                  <button className="button subtle" type="button" onClick={clearFields}>Clear</button>
+                  <button className="button subtle" type="button" disabled={running} onClick={fillDefaults}>Defaults</button>
+                  <button className="button subtle" type="button" disabled={running} onClick={fillSamples}>Fill Samples</button>
+                  <button className="button subtle" type="button" disabled={running} onClick={clearFields}>Clear</button>
                 </div>
               </div>
-              <div className="ai-dynamic-field-grid">
+              <fieldset disabled={running} className="ai-dynamic-field-grid" style={{border: 0, margin: 0, padding: 0}}>
                 {selectedFields.map((field) => (
                   <DynamicField key={field.name} field={field} value={fieldValues[field.name] || ''} onChange={(value) => updateField(field.name, value)} />
                 ))}
-              </div>
+              </fieldset>
             </div>
           ) : null}
 
-          <textarea value={input} onChange={(event) => setInput(event.target.value)} rows={10} />
-          <button className="button primary ai-send-button" type="button" onClick={runTool} disabled={running}>
-            {running ? 'Sending...' : 'Send AI Request'}
-          </button>
+          <textarea disabled={running} value={input} onChange={(event) => setInput(event.target.value)} rows={10} />
+
         </div>
         <div className="stack">
           <div className="muted" style={{ fontWeight: 700 }}>{selectedTool.outputLabel}</div>
           <div className="ai-response-box">
             {error ? <div className="error-text">{error}</div> : null}
             {result ? (
-              <AIResultReport result={result} fields={selectedFields} fieldValues={fieldValues} />
+              <AIResultReport
+                result={result}
+                fields={sourceAIToolFieldsByToolId[result.tool.id] || []}
+                fieldValues={!result.saved && result.tool.id === selectedTool.id ? fieldValues : {}}
+              />
             ) : (
               <div className="ai-empty-result">
                 <div className="pill">Ready</div>
@@ -588,6 +688,33 @@ export default function AIWorkbench({ mode = 'tools' }: AIWorkbenchProps) {
                 <p>Select presets, fill extracted source fields, review the request, then send it to generate a structured report.</p>
               </div>
             )}
+          </div>
+          <div className="ai-saved-results" aria-label="Saved AI results">
+            <div className="section-head compact">
+              <div>
+                <h4>Saved AI Results</h4>
+                <div className="muted">Tenant-scoped reports use the same professional renderer.</div>
+              </div>
+              <span className="pill">{savedResults.length}</span>
+            </div>
+            {historyError ? <div className="error-text">{historyError}</div> : null}
+            {savedResults.length ? (
+              <div className="ai-saved-result-list">
+                {savedResults.map((saved, index) => (
+                  <button
+                    key={saved.id || saved.tool.id + saved.createdAt + index}
+                    data-saved-result-id={saved.id || String(index)}
+                    className={result?.id && saved.id === result.id && result.saved ? 'ai-saved-result-card active' : 'ai-saved-result-card'}
+                    type="button"
+                    onClick={() => { setResult({ ...saved, saved: true }); setError(''); }}
+                  >
+                    <span>{saved.tool.category}</span>
+                    <strong>{saved.tool.title}</strong>
+                    <small>{new Date(saved.createdAt).toLocaleString()} · {saved.provider}</small>
+                  </button>
+                ))}
+              </div>
+            ) : !historyError ? <p className="muted">No saved AI results yet.</p> : null}
           </div>
         </div>
       </div>

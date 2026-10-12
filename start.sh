@@ -10,7 +10,7 @@ if [ -f "$demo_credentials_project_dir/.env" ]; then
     demo_credentials_key="${demo_credentials_line%%=*}"
     demo_credentials_value="${demo_credentials_line#*=}"
     case "$demo_credentials_key" in
-      NODE_ENV|ENABLE_DEMO_CREDENTIAL_AUTOFILL|DEMO_EMAIL|DEMO_PASSWORD|SEED_ADMIN_EMAIL|SEED_ADMIN_PASSWORD|SEED_USER_EMAIL|SEED_USER_PASSWORD|PROVISION_ADMIN_EMAIL|PROVISION_ADMIN_PASSWORD|BOOTSTRAP_ADMIN_EMAIL|BOOTSTRAP_ADMIN_PASSWORD|ADMIN_EMAIL|ADMIN_PASSWORD|DEFAULT_EMAIL|DEFAULT_PASSWORD|DEMO_TENANT|BOOTSTRAP_TENANT_SLUG|GOVERNANCE_TENANT_ID|TENANT_ID) ;;
+      NODE_ENV|ENABLE_DEMO_CREDENTIAL_AUTOFILL|DEMO_EMAIL|DEMO_PASSWORD|PROVISION_ADMIN_EMAIL|PROVISION_ADMIN_PASSWORD|BOOTSTRAP_ADMIN_EMAIL|BOOTSTRAP_ADMIN_PASSWORD|ADMIN_EMAIL|ADMIN_PASSWORD|DEFAULT_EMAIL|DEFAULT_PASSWORD|DEMO_TENANT|BOOTSTRAP_TENANT_SLUG|GOVERNANCE_TENANT_ID|TENANT_ID) ;;
       *) continue ;;
     esac
     [ -n "${!demo_credentials_key+x}" ] && continue
@@ -25,22 +25,12 @@ fi
 demo_credentials_email=""
 demo_credentials_password=""
 demo_credentials_tenant="${DEMO_TENANT:-${BOOTSTRAP_TENANT_SLUG:-${GOVERNANCE_TENANT_ID:-${TENANT_ID:-}}}}"
-demo_credentials_tenant="${DEMO_TENANT:-${BOOTSTRAP_TENANT_SLUG:-${GOVERNANCE_TENANT_ID:-${TENANT_ID:-}}}}"
-demo_credentials_tenant="${DEMO_TENANT:-${BOOTSTRAP_TENANT_SLUG:-${GOVERNANCE_TENANT_ID:-${TENANT_ID:-}}}}"
-demo_credentials_tenant="${DEMO_TENANT:-${BOOTSTRAP_TENANT_SLUG:-${GOVERNANCE_TENANT_ID:-${TENANT_ID:-}}}}"
-demo_credentials_tenant="${DEMO_TENANT:-${BOOTSTRAP_TENANT_SLUG:-${GOVERNANCE_TENANT_ID:-${TENANT_ID:-}}}}"
 if [ -n "${PROVISION_ADMIN_EMAIL:-}" ] && [ -n "${PROVISION_ADMIN_PASSWORD:-}" ]; then
   demo_credentials_email="$PROVISION_ADMIN_EMAIL"
   demo_credentials_password="$PROVISION_ADMIN_PASSWORD"
 elif [ -n "${BOOTSTRAP_ADMIN_EMAIL:-}" ] && [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ]; then
   demo_credentials_email="$BOOTSTRAP_ADMIN_EMAIL"
   demo_credentials_password="$BOOTSTRAP_ADMIN_PASSWORD"
-elif [ -n "${SEED_ADMIN_EMAIL:-}" ] && [ -n "${SEED_ADMIN_PASSWORD:-}" ]; then
-  demo_credentials_email="$SEED_ADMIN_EMAIL"
-  demo_credentials_password="$SEED_ADMIN_PASSWORD"
-elif [ -n "${SEED_USER_EMAIL:-}" ] && [ -n "${SEED_USER_PASSWORD:-}" ]; then
-  demo_credentials_email="$SEED_USER_EMAIL"
-  demo_credentials_password="$SEED_USER_PASSWORD"
 elif [ -n "${DEMO_EMAIL:-}" ] && [ -n "${DEMO_PASSWORD:-}" ]; then
   demo_credentials_email="$DEMO_EMAIL"
   demo_credentials_password="$DEMO_PASSWORD"
@@ -79,11 +69,33 @@ fi
 unset demo_credentials_email demo_credentials_password demo_credentials_tenant demo_credentials_project_dir demo_credentials_line demo_credentials_key demo_credentials_value demo_credentials_first demo_credentials_last
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-set -a
-source "$project_dir/.env"
-set +a
-export COMPLIANCE_LOCAL_LOGIN_ACKNOWLEDGEMENT=runtime-disposable-database
+command="${1:-}"
+case "$command" in
+  check|migrate|start) ;;
+  *) echo "Usage: $0 {check|migrate|start}" >&2; exit 64 ;;
+esac
 
+if [ -f "$project_dir/.env" ]; then
+  set -a
+  source "$project_dir/.env"
+  set +a
+fi
+cd "$project_dir"
+
+if [ "$command" = check ]; then
+  exec npm --prefix frontend run check
+fi
+
+if [ "$command" = migrate ]; then
+  [ "${ALLOW_SCHEMA_MIGRATION:-}" = 1 ] || { echo "Set ALLOW_SCHEMA_MIGRATION=1 after backing up PostgreSQL." >&2; exit 64; }
+  [ -n "${DATABASE_URL:-}" ] || { echo "DATABASE_URL is required" >&2; exit 1; }
+  for migration in frontend/migrations/*.sql; do
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+  done
+  exit 0
+fi
+
+export COMPLIANCE_LOCAL_LOGIN_ACKNOWLEDGEMENT=runtime-disposable-database
 for required in DATABASE_URL AUTH_SECRET DEFAULT_TENANT_ID BACKEND_PORT FRONTEND_PORT; do
   [ -n "${!required:-}" ] || { echo "$required is required" >&2; exit 1; }
 done
@@ -91,12 +103,7 @@ for assigned_port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
   lsof -nP -iTCP:"$assigned_port" -sTCP:LISTEN >/dev/null 2>&1 && { echo "assigned port $assigned_port is occupied" >&2; exit 1; }
 done
 
-cd "$project_dir"
-case "${MIGRATE_ON_START:-0}" in
-  1|true) for migration in frontend/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"; done;;
-esac
-npm --prefix backend run create-admin
-npm --prefix frontend run dev -- -H 127.0.0.1 -p "$BACKEND_PORT" & app_pid=$!
+npm --prefix frontend run start -- -H 127.0.0.1 -p "$BACKEND_PORT" & app_pid=$!
 terminate(){ kill "${app_pid:-}" "${proxy_pid:-}" 2>/dev/null || true; wait "${app_pid:-}" "${proxy_pid:-}" 2>/dev/null || true; }
 trap terminate INT TERM EXIT
 for attempt in {1..480}; do
