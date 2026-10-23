@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEntitySet, resetEntitySet, saveEntitySet } from '@/lib/entityStore';
+import { filterEntityRows } from '@/lib/featurePack';
 import { requireDocumentManager, requireSession } from '@/lib/requestAuth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -9,7 +10,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!set) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json(set);
+  const rows = filterEntityRows(set.rows, request.nextUrl.searchParams.get('q') || '', request.nextUrl.searchParams.get('status') || 'All');
+  return NextResponse.json({ ...set, rows, total: set.rows.length, filteredCount: rows.length });
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {

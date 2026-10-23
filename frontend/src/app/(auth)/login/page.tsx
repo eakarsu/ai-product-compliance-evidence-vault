@@ -52,33 +52,6 @@ export default function LoginPage() {
             Password
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
-          <button
-            type="button"
-            onClick={async () => {
-              const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL || '';
-              const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || '';
-              setEmail(demoEmail);
-              setPassword(demoPassword);
-              if (!demoEmail || !demoPassword) {
-                setError('Demo credentials are not configured.');
-                return;
-              }
-              setSubmitting(true);
-              setError('');
-              const ok = await login(demoEmail, demoPassword);
-              setSubmitting(false);
-              if (!ok) {
-                setError('The email, password, or tenant configuration was not accepted.');
-                return;
-              }
-              router.push('/dashboard');
-            }}
-            disabled={!process.env.NEXT_PUBLIC_DEMO_EMAIL || !process.env.NEXT_PUBLIC_DEMO_PASSWORD}
-            aria-label="Log In as Demo"
-            style={{ width: '100%', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid currentColor', background: 'transparent', cursor: 'pointer' }}
-          >
-            Log In as Demo
-          </button>
           <button className="button primary" type="submit" disabled={submitting}>
             {submitting ? 'Signing in...' : 'Sign in'}
           </button>

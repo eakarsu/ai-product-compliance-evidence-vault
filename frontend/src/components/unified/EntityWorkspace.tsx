@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { rolePermissions } from '@/lib/auth';
+import DomainAIPanel from '@/components/unified/DomainAIPanel';
 import type { EntityRecord, FeatureEntitySet } from '@/lib/featureEntities';
 
 type Props = {
@@ -33,6 +34,7 @@ export default function EntityWorkspace({ slug, seed }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [form, setForm] = useState(emptyRecordForm);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState<EntityRecord | null>(null);
@@ -99,12 +101,10 @@ export default function EntityWorkspace({ slug, seed }: Props) {
 
   if (!dataset) return null;
 
-  const filtered = dataset.rows.filter((row) =>
-    !query ||
-    row.name.toLowerCase().includes(query.toLowerCase()) ||
-    row.owner.toLowerCase().includes(query.toLowerCase()) ||
-    (row.status ?? '').toLowerCase().includes(query.toLowerCase()),
-  );
+  const filtered = dataset.rows.filter((row) => {
+    const matchesQuery = !query || row.name.toLowerCase().includes(query.toLowerCase()) || row.owner.toLowerCase().includes(query.toLowerCase()) || (row.status ?? '').toLowerCase().includes(query.toLowerCase());
+    return matchesQuery && (statusFilter === 'All' || row.status === statusFilter);
+  });
 
   const removeRow = (id: string) => {
     if (!canManage) return;
@@ -198,6 +198,12 @@ export default function EntityWorkspace({ slug, seed }: Props) {
       <h3>{dataset.title}</h3>
       <div className="toolbar-row">
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search records" />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter records by status">
+          <option>All</option>
+          {STATUS_OPTIONS.map((status) => <option key={status}>{status}</option>)}
+        </select>
+        <a className="button subtle" href={'/api/entities/' + slug + '/export?format=csv&q=' + encodeURIComponent(query) + '&status=' + encodeURIComponent(statusFilter)}>Export CSV</a>
+        <a className="button subtle" href={'/api/entities/' + slug + '/export?format=json&q=' + encodeURIComponent(query) + '&status=' + encodeURIComponent(statusFilter)}>Export JSON</a>
         <span className="save-indicator">{saving ? 'Saving...' : 'Saved'}</span>
         <div className="muted">{canManage ? 'Edit mode' : 'Read-only mode'}</div>
         <button className="button subtle" type="button" onClick={reset} disabled={!canManage}>Reset records</button>
@@ -252,6 +258,8 @@ export default function EntityWorkspace({ slug, seed }: Props) {
           </tbody>
         </table>
       </div>
+
+      <DomainAIPanel slug={slug} />
 
       {showAddModal ? (
         <div className="record-modal-backdrop" role="presentation" onClick={() => setShowAddModal(false)}>

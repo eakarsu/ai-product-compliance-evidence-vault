@@ -476,6 +476,7 @@ const allFeatures = [...features, ...supplementalFeatures, ...productionPlatform
 
 export const primaryNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Tasks', href: '/tasks', icon: ClipboardList },
   { label: 'All Features', href: '/features', icon: Blocks },
   { label: 'Production Readiness', href: '/production-readiness', icon: ShieldCheck },
   { label: 'Documents', href: '/documents', icon: Files },
